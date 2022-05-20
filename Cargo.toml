@@ -9,3 +9,5 @@ edition = "2021"
 name = "mlp"
 path = "src/mlp/mod.rs"
 [dependencies]
+rand = "0.8.5"
+

@@ -3,8 +3,9 @@
 // Created at 2022/05/19 10:18
 // Edit with VS Code
 
-pub mod mlp;
-
+#![allow(dead_code, unused_imports)]
+use mlp::*;
 fn main() {
-    println!("Hello, world!");
+    
+    println!("{}", init_matrix(3, 3));
 }
