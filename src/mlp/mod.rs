@@ -1,7 +1,7 @@
 use rand;
 
 mod matrix;
-pub mod activation;
+pub mod functions;
 pub use self::matrix::Matrix;
 
 pub fn init_matrix(rows: usize, cols: usize) -> Matrix<f64> {

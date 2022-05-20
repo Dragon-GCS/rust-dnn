@@ -4,6 +4,7 @@
         "matmul",
         "Perceptron",
         "relu",
-        "softmax"
+        "softmax",
+        "softmaxed"
     ]
 }
