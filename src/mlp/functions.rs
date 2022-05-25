@@ -58,20 +58,23 @@ pub fn sigmoid_prime (mat: &Matrix<f64>) -> Matrix<f64> {
 
 /// Calculate the softmax of a matrix
 /// $$f(x) = \frac{e^{x_i}}{\sum_{j}e^{x_j}}$$
-pub fn softmax (mat: &Matrix<f64>) -> Matrix<f64> {
+pub fn softmax (mat: &Matrix<f64>, dim: usize) -> Matrix<f64> {
     let mut v = Vec::new();
     let mut sum = Vec::new();
-    for i in 0..mat.rows {
+    let (mut dim1, mut dim2) = (mat.rows, mat.cols);
+    if dim == 0 {(dim1, dim2) = (mat.cols, mat.rows);}
+    for i in 0..dim1 {
         sum.push(0.0);
-        for j in 0..mat.cols {
-            let exp = mat.v[i * mat.cols + j].exp();
+        for j in 0..dim2 {
+            let exp = if dim == 0 {mat.v[j * mat.cols + i].exp()} else {mat.v[i * mat.cols + j].exp()};
             v.push(exp);
             sum[i] += exp;
         }
     }
-    for i in 0..mat.rows {
-        for j in 0..mat.cols {
-            v[i * mat.cols + j] /= sum[i];
+    for i in 0..dim1 {
+        for j in 0..dim2 {
+            let index = if dim == 0 {j * mat.cols + i} else {i * mat.cols + j};
+            v[index] /= sum[i];
         }
     }
     Matrix::new(v, mat.rows, mat.cols)
@@ -115,6 +118,14 @@ pub fn cross_entropy_prime(mat: &Matrix<f64>, target: &Matrix<f64>) -> Matrix<f6
         v.push((pred - real) / rows as f64);
     }
     Matrix::new(v, mat.rows, mat.cols)
+}
+
+pub fn accuracy(pred: &Vec<usize>, label: &Vec<usize>) -> f64 {
+    let mut sum = 0.;
+    for (p, l) in pred.iter().zip(label.iter()) {
+        if *p == *l { sum += 1. }
+    }
+    sum / pred.len() as f64
 }
 
 #[cfg(test)]
@@ -167,7 +178,8 @@ mod test {
             [0.090031, 0.244728, 0.665241], 
             [0.211941, 0.576116, 0.211941], 
             [0.665241, 0.244728, 0.090031]];
-        for (pred, real) in softmax(&m).v.iter().zip(r.v.iter()) {
+        for (pred, real) in softmax(&m, 1).v.iter().zip(r.v.iter()) {
+            println!("{:?} {:?}", pred, real);
             assert!((pred - real).abs() < 1e-6);
         }
         let p = mat![
@@ -178,11 +190,7 @@ mod test {
             assert!((pred - real).abs() < 1e-6);
         }
     }
-    
-    // let ce_p = mat![
-    //     [-0.909969, 0.244728, 0.665241], 
-    //     [0.211941, -0.423884, 0.211941], 
-    //     [0.665241, 0.244728, -0.909969]];
+
     #[test]
     pub fn test_cross_entropy() {
         let m =  mat![

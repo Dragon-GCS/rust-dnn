@@ -4,8 +4,7 @@
 // Edit with VS Code
 
 use std::fmt::{self, Display};
-use std::ops::{Add, BitAnd, Mul, Neg, Sub};
-
+use std::ops::{Add, AddAssign, BitAnd, Mul, Neg, Sub};
 
 /// Use a vector to represent a matrix
 /// matrix index \[i\]\[j\] => vector index \[i * cols + j\]
@@ -18,30 +17,22 @@ pub struct Matrix<T> {
     pub cols: usize,
 }
 
-impl<T: Copy> Matrix<T> {
+impl<T> Matrix<T> {
     pub fn new(v: Vec<T>, rows: usize, cols: usize) -> Self {
         assert!(v.len() == rows * cols);
-        Matrix {
-            v,
-            rows,
-            cols,
-        }
+        Matrix { v, rows, cols }
     }
+}
 
+impl<T: Copy> Matrix<T> {
     pub fn from_vec(vec: Vec<Vec<T>>) -> Self {
         let rows = vec.len();
         let cols = vec[0].len();
-        let mut v = Vec::with_capacity(rows * cols);
-        for row in vec.iter() {
-            for elem in row.iter() {
-                v.push(*elem);
-            }
+        let mut v = Vec::new();
+        for i in 0..vec.len() {
+            v.extend(&vec[i])
         }
-        Matrix {
-            v,
-            rows,
-            cols,
-        }
+        Self::new(v, rows, cols)
     }
 
     pub fn transpose(&self) -> Self {
@@ -55,26 +46,74 @@ impl<T: Copy> Matrix<T> {
     }
 }
 
-impl<T> Add for Matrix<T>
-where
-    T: Add<Output = T> + Copy,
-{
-    type Output = Self;
-    fn add(self, other: Self) -> Self {
-        assert_eq!(self.rows, other.rows);
-        assert_eq!(self.cols, other.cols);
+impl<T: Add<Output = T> + Copy> Matrix<T> {
+    pub fn dim_sum(&self, dim: usize) -> Matrix<T> {
         let mut v = Vec::new();
-        for i in 0..self.v.len() {
-            v.push(self.v[i] + other.v[i]);
+        let (mut rows, mut cols) = (self.rows, 1);
+        let (mut dim1, mut dim2) = (self.rows, self.cols);
+        if dim == 0 {
+            (rows, cols) = (1, self.cols);
+            (dim1, dim2) = (self.cols, self.rows);
         }
-        Matrix::new(v, self.rows, self.cols)
+        for i in 0..dim1 {
+            let start_idx = if dim == 0 {i} else { i * self.cols};
+            v.push(self.v[start_idx]);
+            for j in 1..dim2 {
+                v[i] = v[i] + self.v[start_idx + j * cols];
+            }
+        }
+        Matrix::new(v, rows, cols)
     }
 }
 
-impl<T> Mul for Matrix<T>
-where
-    T: Mul<Output = T> + Copy,
-{
+impl<T: PartialOrd + Copy> Matrix<T> {
+    pub fn argmax(&self, dim: usize) -> Vec<usize> {
+        let mut v = Vec::new();
+        let cols = if dim == 0 {self.rows} else {1};
+        let (mut dim1, mut dim2) = (self.rows, self.cols);
+        if dim == 0 {
+            (dim1, dim2) = (self.cols, self.rows);
+        }
+        for i in 0..dim1 {
+            let start_idx = if dim == 0 {i} else { i * self.cols};
+            let (mut max_index, mut max) = (0, self.v[start_idx]);
+            for j in 0..dim2 {
+                let elem = self.v[start_idx + j * cols];
+                if elem > max {
+                    max = elem;
+                    max_index = j;
+                }
+            }
+            v.push(max_index)
+        }
+        v
+    }
+}
+
+impl<T: Add<Output = T> + Copy> Add for Matrix<T> {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        assert!(
+            (self.rows == other.rows || self.cols == other.cols)
+                && (self.v.len() % other.v.len() == 0)
+        );
+        let mut v = Vec::with_capacity(self.v.len());
+
+        for i in 0..self.v.len() {
+            let other_idx = if other.cols == 1 {
+                i / self.cols
+            } else if other.rows == 1 {
+                i % self.cols
+            } else {
+                i
+            };
+            v.push(self.v[i] + other.v[other_idx]);
+        }
+        Matrix::<T>::new(v, self.rows, self.cols)
+    }
+}
+
+impl<T: Mul<Output = T> + Copy> Mul for Matrix<T>{
     type Output = Self;
 
     fn mul(self, other: Matrix<T>) -> Matrix<T> {
@@ -86,10 +125,7 @@ where
     }
 }
 
-impl<T> Sub for Matrix<T>
-where
-    T: Sub<Output = T> + Copy,
-{
+impl<T: Sub<Output = T> + Copy> Sub for Matrix<T>{
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
@@ -101,24 +137,21 @@ where
     }
 }
 
-impl<T> Neg for Matrix<T>
-where
-    T: Neg<Output = T> + Copy,
-{
+impl<T: Neg<Output = T> + Copy> Neg for Matrix<T> {
     type Output = Self;
     fn neg(self) -> Self {
         let mut v = Vec::new();
         for i in 0..self.v.len() {
             v.push(-self.v[i]);
         }
-        Matrix::new(v, self.rows, self.cols)
+        Matrix::<T>::new(v, self.rows, self.cols)
     }
 }
 
-// impl matrix multiplication by '&'
+// impl matrix multiplication by '&', iterate order by ikj
 impl<T> BitAnd for Matrix<T>
 where
-    T: Mul<Output = T> + Copy,
+    T: Add<Output = T> + Mul<Output = T> + AddAssign + Copy,
 {
     type Output = Self;
     fn bitand(self, other: Self) -> Self {
@@ -126,11 +159,17 @@ where
 
         let mut v = Vec::new();
         for i in 0..self.rows {
-            for j in 0..self.cols {
-                v.push(self.v[i * self.cols + j] * other.v[j * other.cols + i]);
+            for j in 0..other.cols {
+                v.push(self.v[i * self.cols] * other.v[j]);
+            }
+            for k in 1..self.cols {
+                let t = self.v[i * self.cols + k];
+                for j in 0..other.cols {
+                    v[i * other.cols + j] += t * other.v[k * other.cols + j];
+                }
             }
         }
-        Matrix::new(v, self.rows, self.cols)
+        Matrix::new(v, self.rows, other.cols)
     }
 }
 
@@ -163,7 +202,7 @@ impl<T: Display> fmt::Display for Matrix<T> {
 }
 
 #[cfg(test)]
-mod test{
+mod test {
     use super::*;
 
     #[test]
@@ -171,11 +210,40 @@ mod test{
         let a = Matrix::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 2, 5);
         let b = Matrix::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 2, 5);
         let c = b.transpose();
-        assert_eq!(a.clone() + b.clone(), Matrix::new(vec![2, 4, 6, 8, 10, 12, 14, 16, 18, 20], 2, 5));
-        assert_eq!(a.clone() * b.clone(), Matrix::new(vec![1, 4, 9, 16, 25, 36, 49, 64, 81, 100], 2, 5));
-        assert_eq!(a.clone() - b.clone(), Matrix::new(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 2, 5));
-        assert_eq!(-a.clone(), Matrix::new(vec![-1, -2, -3, -4, -5, -6, -7, -8, -9, -10], 2, 5));
+        let d = Matrix::new(vec![1, 1, 1, 1, 1], 1, 5);
+        assert_eq!(
+            a.clone() + d.clone(),
+            Matrix::new(vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 2, 5)
+        );
+        assert_eq!(
+            a.clone() + b.clone(),
+            Matrix::new(vec![2, 4, 6, 8, 10, 12, 14, 16, 18, 20], 2, 5)
+        );
+        assert_eq!(
+            a.clone() * b.clone(),
+            Matrix::new(vec![1, 4, 9, 16, 25, 36, 49, 64, 81, 100], 2, 5)
+        );
+        assert_eq!(
+            a.clone() - b.clone(),
+            Matrix::new(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 2, 5)
+        );
+        assert_eq!(
+            -a.clone(),
+            Matrix::new(vec![-1, -2, -3, -4, -5, -6, -7, -8, -9, -10], 2, 5)
+        );
         assert_eq!(c, Matrix::new(vec![1, 6, 2, 7, 3, 8, 4, 9, 5, 10], 5, 2));
-        assert_eq!(a.clone() & c.clone(), Matrix::new(vec![1, 4, 9, 16, 25, 36, 49, 64, 81, 100], 2, 5));
+        assert_eq!(
+            a.clone() & c.clone(),
+            Matrix::new(vec![55, 130, 130, 330], 2, 2)
+        );
+    }
+
+    #[test]
+    fn test_dim() {
+        let a = Matrix::new(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 3, 4);
+        assert_eq!(a.dim_sum(0), Matrix::new(vec![12, 15, 18, 21], 1, 4));
+        assert_eq!(a.dim_sum(1), Matrix::new(vec![6, 22, 38], 3, 1));
+        assert_eq!(a.argmax(0), vec![2, 2, 2, 2]);
+        assert_eq!(a.argmax(1), vec![3, 3, 3]);
     }
 }

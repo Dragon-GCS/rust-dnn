@@ -1,13 +1,14 @@
 use rand;
 
 mod matrix;
+pub mod layers;
 pub mod functions;
 pub use self::matrix::Matrix;
 
 pub fn init_matrix(rows: usize, cols: usize) -> Matrix<f64> {
     let mut v = Vec::with_capacity(rows * cols);
     for _ in 0..rows * cols {
-        v.push(rand::random::<f64>());
+        v.push(rand::random::<f64>() * 2. - 1.);
     }
     Matrix::new(v, rows, cols)
 }
@@ -23,4 +24,34 @@ macro_rules! mat {
         )*
         buff
     })};
+}
+
+pub struct MLP {
+    pub linear: Vec<layers::Linear>,
+    pub output: layers::CEOutput,
+}
+
+impl MLP {
+    pub fn new(layers: Vec<layers::Linear>) -> Self {
+        let output = layers::CEOutput::new();
+        MLP{
+            linear: layers,
+            output,
+        }
+    }
+
+    pub fn forward(&mut self, x: &Matrix<f64>, y: &Matrix<f64>) -> (Matrix<f64>, f64) {
+        let mut z = x.clone();
+        for layer in self.linear.iter_mut() {
+            z = layer.forward(&z);
+        }
+        self.output.forward(&z, y)
+    }
+
+    pub fn backward(&mut self, y: &Matrix<f64>, lr: f64) {
+        let mut grad = self.output.backward(y);
+        for layer in self.linear.iter_mut().rev() {
+            grad = layer.backward(&grad, lr);
+        }
+    }
 }
