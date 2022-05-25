@@ -4,11 +4,11 @@
 // Edit with VS Code
 
 #![allow(dead_code, unused_imports, unused_variables)]
-mod data_load;
+mod dataset;
 
 use std::io::Read;
 use mlp::{MLP, layers::Linear, mat, functions, Matrix};
-use data_load::{read_label, read_img};
+use dataset::{read_label, read_img, Datasets};
 
 fn load_file(filename: &str) -> Vec<u8> {
     let mut f = std::fs::File::open(filename).unwrap();
@@ -17,23 +17,23 @@ fn load_file(filename: &str) -> Vec<u8> {
     buff
 }
 
-fn train(model: &mut MLP, x: &Matrix<f64>, y: &Matrix<f64>, lr: f64, epoch: usize, batch_size: usize) {
+fn train(model: &mut MLP, dataset: &mut Datasets<f64,usize>, lr: f64, epoch: usize) {
+    let mut step = 0;
+    let batches = dataset.len();
     for i in 0..epoch {
-        for batch in 0..x.rows / batch_size {
-            // let start = batch * batch_size;
-            // let end = start + batch_size;
-            // let x_batch = x.slice(start..end, ..);
-            // let y_batch = y.slice(start..end, ..);
-            // let (z, loss) = model.forward(&x_batch, &y_batch);
-            // model.backward(&y_batch, lr);
-            // println!("epoch: {}, batch: {}, loss: {}", i, batch, loss);
-            ..;
-        }
-        if i % 10 == 0 {
-            println!("epoch {}", i);
+        dataset.shuffle();
+        for (batch, image, label) in &mut *dataset {
+            let y = functions::one_hot(&label, 10);
+            let (output, loss) = model.forward(&image, &y);
+            let pred = output.argmax(1);
+            let acc = functions::accuracy(&pred, &label);
+            if batch % 100 == 99 || batch == 0 {
+                println!("[{}/{}]step: {}/{}, loss: {:.6}, acc: {:.4}",i + 1, epoch, batch + 1, batches, loss, acc);
+            }
+            model.backward(&y, lr);
+            step += 1
         }
     }
-    model.backward(y, 0.1);
 }
 
 fn test_train() {
@@ -61,49 +61,23 @@ pub fn test_mnist() {
     let data_dir: &str = "E:\\ProjectFiles\\Python\\04_DeepLearning\\Datasets\\mnist\\raw";
     let train_img: &str = "train-images-idx3-ubyte";
     let train_label: &str = "train-labels-idx1-ubyte";
-    let test_img: &str = "t10k-images-idx3-ubyte";
-    let test_label: &str = "t10k-labels-idx1-ubyte";
 
-    let test_image = read_img(&format!("{}/{}",data_dir, test_img));
-    let test_label = read_label(&format!("{}/{}", data_dir, test_label));
-    let mut lr = 1e-2;
+    let image = read_img(&format!("{}/{}",data_dir, train_img));
+    let labels = read_label(&format!("{}/{}", data_dir, train_label));
     let batch = 25;
-
+    let mut dataset = Datasets::new(image, labels, batch);
+    
     let mut layers = Vec::new();
     layers.push(Linear::new(784, 24, true));
     layers.push(Linear::new(24, 24, true));
     layers.push(Linear::new(24, 24, true));
     layers.push(Linear::new(24, 10, false));
     let mut model = MLP::new(layers);
-
-    println!("Start training");
-    for i in 0..10 {
-        for b in 0..(test_image.rows / batch) - 1 {
-            let start = b * batch;
-            let end = (b + 1) * batch;
-            let x_batch = Matrix::new(test_image.v[start * 784..end * 784].to_vec(), batch, 784);
-            let label = test_label[start..end].to_vec();
-            let y_batch = functions::one_hot(&label, 10);
-
-            let (z, loss) = model.forward(&x_batch, &y_batch);
-            let pred = z.argmax(1);
-            let acc = functions::accuracy(&pred, &label);
-            if b % 50 == 0 {
-                println!("epoch: {}, batch: {:3}, loss: {:.4}, accuracy: {:.4}", i, b, loss, acc);
-            }
-            model.backward(&y_batch, lr);
-        }
-        lr *= 0.9;
-    }
+    
+    let lr = 1e-3;
+    train(&mut model, &mut dataset, lr, 10);
 
 }
 fn main() {
     test_mnist()
-    // let a = Matrix::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 2, 5);
-    // let b = Matrix::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 2, 5);
-    // println!("{:}", a.clone() & b.transpose());
-    // assert_eq!(
-    //     a.clone() & c.clone(),
-    //     Matrix::new(vec![55, 130, 130, 330], 2, 2)
-    // );
 }
