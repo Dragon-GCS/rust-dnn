@@ -120,12 +120,28 @@ pub fn cross_entropy_prime(mat: &Matrix<f64>, target: &Matrix<f64>) -> Matrix<f6
     Matrix::new(v, mat.rows, mat.cols)
 }
 
-pub fn accuracy(pred: &Vec<usize>, label: &Vec<usize>) -> f64 {
-    let mut sum = 0.;
-    for (p, l) in pred.iter().zip(label.iter()) {
-        if *p == *l { sum += 1. }
+pub struct  Metric {
+    right: f64,
+    total: f64,
+}
+
+impl Metric {
+    pub fn new() -> Self {
+        Self { right: 0., total: 0. }
     }
-    sum / pred.len() as f64
+
+    pub fn update(&mut self, pred: &Vec<usize>, label: &Vec<usize>) -> f64 {
+        for (&p, &l) in pred.iter().zip(label.iter()) {
+            if p == l { self.right += 1. }
+            self.total += 1.;
+        }
+        self.right / self.total
+    }
+
+    pub fn reset(&mut self) {
+        self.right = 0.;
+        self.total = 0.;
+    }
 }
 
 #[cfg(test)]

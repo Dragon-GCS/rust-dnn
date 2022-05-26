@@ -1,4 +1,4 @@
-use rand;
+use rand::Rng;
 
 mod matrix;
 pub mod layers;
@@ -6,9 +6,10 @@ pub mod functions;
 pub use self::matrix::Matrix;
 
 pub fn init_matrix(rows: usize, cols: usize) -> Matrix<f64> {
-    let mut v = Vec::with_capacity(rows * cols);
-    for _ in 0..rows * cols {
-        v.push(rand::random::<f64>() * 2. - 1.);
+    let mut v = vec![0.; rows * cols];
+    let mut rng = rand::thread_rng();
+    for elem in v.iter_mut() {
+        *elem = rng.gen::<f64>() * 2. - 1.;
     }
     Matrix::new(v, rows, cols)
 }

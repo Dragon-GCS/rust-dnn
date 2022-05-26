@@ -4,6 +4,9 @@ use crate::functions as F;
 pub struct Linear {
     pub weights: Matrix<f64>,
     pub biases: Matrix<f64>,
+    t: i32,
+    grad_m: (Matrix<f64>, Matrix<f64>),
+    grad_v: (Matrix<f64>, Matrix<f64>),
     active: bool,
     pub input: Option<Matrix<f64>>,
     pub output: Option<Matrix<f64>>,
@@ -12,10 +15,19 @@ pub struct Linear {
 impl Linear {
     pub fn new(in_channel: usize, out_channel: usize, active: bool) -> Self {
         let weights = init_matrix(in_channel, out_channel);
-        let biases = init_matrix(1, out_channel);
+        let biases = Matrix::new(vec![0f64; out_channel], 1, out_channel);
+        let grad_m = (
+            Matrix::new(vec![0f64; in_channel * out_channel], in_channel, out_channel), 
+            Matrix::new(vec![0f64; out_channel], 1, out_channel));
+        let grad_v = (
+            Matrix::new(vec![0f64; in_channel * out_channel], in_channel, out_channel), 
+            Matrix::new(vec![0f64; out_channel], 1, out_channel));
         Linear {
             weights,
             biases,
+            t: 1,
+            grad_m,
+            grad_v,
             active: active,
             input: None,
             output: None,
@@ -44,10 +56,19 @@ impl Linear {
         let d_bias = d_output.clone().dim_sum(0);
         let batch = grad.rows as f64;
         for i in 0..d_weights.v.len() {
-            self.weights.v[i] -= lr * d_weights.v[i] / batch;
+            let m = (0.9 * self.grad_m.0.v[i] + 0.1 * d_weights.v[i] / batch) / (1.0 - 0.9f64.powi(self.t));
+            let v = (0.999 * self.grad_v.0.v[i] + 0.001 * d_weights.v[i] * d_weights.v[i] / batch) / (1.0 - 0.999f64.powi(self.t));
+            self.grad_m.0.v[i] = m;
+            self.grad_v.0.v[i] = v;
+            self.weights.v[i] -= lr * m / (v.sqrt() + 1e-8);
             if i / self.weights.cols == 0 {
-                self.biases.v[i] -= lr * d_bias.v[i] / batch;
+                let m = (0.9 * self.grad_m.1.v[i] + 0.1 * d_bias.v[i] / batch) / (1.0 - 0.9f64.powi(self.t));
+                let v = (0.999 * self.grad_v.1.v[i] + 0.001 * d_bias.v[i] * d_bias.v[i] / batch) / (1.0 - 0.999f64.powi(self.t));
+                self.grad_m.1.v[i] = m;
+                self.grad_v.1.v[i] = v;
+                self.biases.v[i] -= lr * m / (v.sqrt() + 1e-8);
             }
+            self.t += 1;
         }
         // d_input: (in_channel, out_channel) & (out_channel, num)
         d_output & self.weights.clone().transpose()

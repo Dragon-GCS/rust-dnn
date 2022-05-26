@@ -4,7 +4,7 @@
 // Edit with VS Code
 
 use std::fmt::{self, Display};
-use std::ops::{Add, AddAssign, BitAnd, Mul, Neg, Sub, Index, Range};
+use std::ops::{Add, AddAssign, BitAnd, Index, Mul, Neg, Range, Sub};
 
 /// Use a vector to represent a matrix
 /// matrix index \[i\]\[j\] => vector index \[i * cols + j\]
@@ -69,26 +69,60 @@ where
     }
 }
 
-impl<T> Index<usize> for Matrix<T> {
-    type Output = [T];
+impl Matrix<f64>
+{
+    pub fn square(&self) -> Self {
+        Matrix {
+            v: self.v.iter().map(|&x| x * x).collect(),
+            rows: self.rows,
+            cols: self.cols,
+        }
+    }
 
-    fn index<'a>(&self, index: usize) -> &[T] {
-        &self.v[index * self.cols..(index + 1) * self.cols]
+    pub fn sqrt(&self) -> Self {
+        Matrix {
+            v: self.v.iter().map(|&x| x.sqrt()).collect(),
+            rows: self.rows,
+            cols: self.cols,
+        }
+    }
+
+    pub fn add_num(&self, num: f64) -> Self {
+        Matrix {
+            v: self.v.iter().map(|&x| x + num).collect(),
+            rows: self.rows,
+            cols: self.cols,
+        }
+    }
+
+    pub fn mul_num(&self, num: f64) -> Self {
+        Matrix {
+            v: self.v.iter().map(|&x| x * num).collect(),
+            rows: self.rows,
+            cols: self.cols,
+        }
+    }
+
+    pub fn div_num(&self, num: f64) -> Self {
+        Matrix {
+            v: self.v.iter().map(|&x| x / num).collect(),
+            rows: self.rows,
+            cols: self.cols,
+        }
+    }
+
+    pub fn sub_num(&self, num: f64) -> Self {
+        Matrix {
+            v: self.v.iter().map(|&x| x - num).collect(),
+            rows: self.rows,
+            cols: self.cols,
+        }
     }
 }
-
-impl<T> Index<Range<usize>> for Matrix<T> {
-    type Output = [T];
-
-    fn index(&self, index: Range<usize>) -> &[T] {
-        &self.v[index.start * self.cols..index.end * self.cols]
-    }
-}
-
 
 impl<T> Matrix<T>
 where
-    T: PartialOrd + Copy,
+T: PartialOrd + Copy,
 {
     pub fn argmax(&self, dim: usize) -> Vec<usize> {
         let mut v = Vec::new();
@@ -113,15 +147,31 @@ where
     }
 }
 
+impl<T> Index<usize> for Matrix<T> {
+    type Output = [T];
+
+    fn index<'a>(&self, index: usize) -> &[T] {
+        &self.v[index * self.cols..(index + 1) * self.cols]
+    }
+}
+
+impl<T> Index<Range<usize>> for Matrix<T> {
+    type Output = [T];
+
+    fn index(&self, index: Range<usize>) -> &[T] {
+        &self.v[index.start * self.cols..index.end * self.cols]
+    }
+}
+
 impl<T> Add for Matrix<T>
 where
-    T: Add<Output = T> + Copy,
+T: Add<Output = T> + Copy,
 {
     type Output = Self;
     fn add(self, other: Self) -> Self {
         assert!(
             (self.rows == other.rows || self.cols == other.cols)
-                && (self.v.len() % other.v.len() == 0)
+            && (self.v.len() % other.v.len() == 0)
         );
         let mut v = Vec::with_capacity(self.v.len());
 
