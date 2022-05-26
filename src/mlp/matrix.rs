@@ -69,8 +69,7 @@ where
     }
 }
 
-impl Matrix<f64>
-{
+impl Matrix<f64> {
     pub fn square(&self) -> Self {
         Matrix {
             v: self.v.iter().map(|&x| x * x).collect(),
@@ -122,7 +121,7 @@ impl Matrix<f64>
 
 impl<T> Matrix<T>
 where
-T: PartialOrd + Copy,
+    T: PartialOrd + Copy,
 {
     pub fn argmax(&self, dim: usize) -> Vec<usize> {
         let mut v = Vec::new();
@@ -165,13 +164,13 @@ impl<T> Index<Range<usize>> for Matrix<T> {
 
 impl<T> Add for Matrix<T>
 where
-T: Add<Output = T> + Copy,
+    T: Add<Output = T> + Copy,
 {
     type Output = Self;
     fn add(self, other: Self) -> Self {
         assert!(
             (self.rows == other.rows || self.cols == other.cols)
-            && (self.v.len() % other.v.len() == 0)
+                && (self.v.len() % other.v.len() == 0)
         );
         let mut v = Vec::with_capacity(self.v.len());
 

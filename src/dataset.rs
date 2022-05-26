@@ -1,7 +1,12 @@
 #![allow(unused_imports, unused_variables, dead_code)]
-use std::{fs::File, io::{Read, Result}, slice::SliceIndex, ops::Index};
-use rand::{thread_rng, seq::SliceRandom};
-use mlp::{mat, functions, Matrix};
+use mlp::{functions, mat, Matrix};
+use rand::{seq::SliceRandom, thread_rng};
+use std::{
+    fs::File,
+    io::{Read, Result},
+    ops::Index,
+    slice::SliceIndex,
+};
 
 fn read_file(path: &str) -> Vec<u8> {
     let mut file = File::open(path).expect("file not found");
@@ -14,7 +19,10 @@ pub fn read_label(path: &str) -> Vec<usize> {
     let data = read_file(path);
     let num = u32::from_be_bytes(data[4..8].try_into().unwrap());
     println!("Load {} labels", num);
-    let labels = data[8..].iter().map(|x| *x as usize).collect::<Vec<usize>>();
+    let labels = data[8..]
+        .iter()
+        .map(|x| *x as usize)
+        .collect::<Vec<usize>>();
     assert!(labels.len() == num as usize);
     labels
 }
@@ -23,12 +31,16 @@ pub fn read_img(path: &str) -> Matrix<f64> {
     let data = read_file(path);
     let num = u32::from_be_bytes(data[4..8].try_into().unwrap()) as usize;
     let (rows, cols) = (
-        u32::from_be_bytes(data[8..12].try_into().unwrap()) as usize, 
-        u32::from_be_bytes(data[12..16].try_into().unwrap()) as usize);
+        u32::from_be_bytes(data[8..12].try_into().unwrap()) as usize,
+        u32::from_be_bytes(data[12..16].try_into().unwrap()) as usize,
+    );
     println!("Load {} images, {}x{}", num, rows, cols);
-    let images = data[16..].iter().map(|x| f64::from(*x) / 255.0).collect::<Vec<f64>>();
+    let images = data[16..]
+        .iter()
+        .map(|x| f64::from(*x) / 255.0)
+        .collect::<Vec<f64>>();
     assert!(images.len() == num * rows * cols);
-    Matrix::new(images, num , rows * cols)
+    Matrix::new(images, num, rows * cols)
 }
 
 pub struct Datasets<T, U> {
@@ -40,7 +52,7 @@ pub struct Datasets<T, U> {
 }
 
 impl<T, U> Datasets<T, U> {
-    pub fn new (x: Matrix<T>, y: Vec<U>, batch_size: usize) -> Self {
+    pub fn new(x: Matrix<T>, y: Vec<U>, batch_size: usize) -> Self {
         let mut idx = (0..x.rows).collect::<Vec<usize>>();
         idx.shuffle(&mut rand::thread_rng());
         Datasets {
@@ -48,7 +60,7 @@ impl<T, U> Datasets<T, U> {
             y,
             i: 0,
             idx,
-            batch_size
+            batch_size,
         }
     }
 
@@ -77,7 +89,7 @@ where
         if start >= self.idx.len() {
             return None;
         }
-        let end = self.idx.len().min((self.i + 1) *  self.batch_size);
+        let end = self.idx.len().min((self.i + 1) * self.batch_size);
         let mut batch_x = Vec::with_capacity(self.x.cols * self.batch_size);
         let mut batch_y = Vec::with_capacity(self.batch_size);
         for i in start..end {
@@ -85,6 +97,10 @@ where
             batch_y.push(self.y[self.idx[i]]);
         }
         self.i += 1;
-        Some((self.i - 1, Matrix::new(batch_x, batch_y.len(), self.x.cols), batch_y))
+        Some((
+            self.i - 1,
+            Matrix::new(batch_x, batch_y.len(), self.x.cols),
+            batch_y,
+        ))
     }
 }

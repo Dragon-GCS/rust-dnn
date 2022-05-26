@@ -1,8 +1,8 @@
 use rand::Rng;
 
-mod matrix;
-pub mod layers;
 pub mod functions;
+pub mod layers;
+mod matrix;
 pub use self::matrix::Matrix;
 
 pub fn init_matrix(rows: usize, cols: usize) -> Matrix<f64> {
@@ -35,7 +35,7 @@ pub struct MLP {
 impl MLP {
     pub fn new(layers: Vec<layers::Linear>) -> Self {
         let output = layers::CEOutput::new();
-        MLP{
+        MLP {
             linear: layers,
             output,
         }

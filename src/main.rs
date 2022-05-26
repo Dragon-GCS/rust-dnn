@@ -8,8 +8,8 @@ mod dataset;
 
 use dataset::{read_img, read_label, Datasets};
 use mlp::{functions, layers::Linear, mat, Matrix, MLP};
-use std::time::Instant;
 use std::io::{self, Read, Write};
+use std::time::Instant;
 
 fn train(model: &mut MLP, dataset: &mut Datasets<f64, usize>, lr: f64, epoch: usize) {
     let mut step = 0;
@@ -61,5 +61,5 @@ fn main() {
     let mut model = MLP::new(layers);
 
     let lr = 1e-3;
-    train(&mut model, &mut dataset, lr, 10);
+    train(&mut model, &mut dataset, lr, 20);
 }

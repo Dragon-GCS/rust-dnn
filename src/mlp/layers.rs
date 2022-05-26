@@ -1,5 +1,5 @@
-use crate::{init_matrix, Matrix};
 use crate::functions as F;
+use crate::{init_matrix, Matrix};
 
 pub struct Linear {
     pub weights: Matrix<f64>,
@@ -17,11 +17,21 @@ impl Linear {
         let weights = init_matrix(in_channel, out_channel);
         let biases = Matrix::new(vec![0f64; out_channel], 1, out_channel);
         let grad_m = (
-            Matrix::new(vec![0f64; in_channel * out_channel], in_channel, out_channel), 
-            Matrix::new(vec![0f64; out_channel], 1, out_channel));
+            Matrix::new(
+                vec![0f64; in_channel * out_channel],
+                in_channel,
+                out_channel,
+            ),
+            Matrix::new(vec![0f64; out_channel], 1, out_channel),
+        );
         let grad_v = (
-            Matrix::new(vec![0f64; in_channel * out_channel], in_channel, out_channel), 
-            Matrix::new(vec![0f64; out_channel], 1, out_channel));
+            Matrix::new(
+                vec![0f64; in_channel * out_channel],
+                in_channel,
+                out_channel,
+            ),
+            Matrix::new(vec![0f64; out_channel], 1, out_channel),
+        );
         Linear {
             weights,
             biases,
@@ -38,7 +48,9 @@ impl Linear {
         // input.shape = (batch, in_channel)
         self.input = Some(input.clone());
         let mut output = (input.clone() & self.weights.clone()) + self.biases.clone();
-        if self.active { output = F::relu(&output) }
+        if self.active {
+            output = F::relu(&output)
+        }
         self.output = Some(output.clone());
         // output.shape = (batch, out_channel)
         output
@@ -56,14 +68,18 @@ impl Linear {
         let d_bias = d_output.clone().dim_sum(0);
         let batch = grad.rows as f64;
         for i in 0..d_weights.v.len() {
-            let m = (0.9 * self.grad_m.0.v[i] + 0.1 * d_weights.v[i] / batch) / (1.0 - 0.9f64.powi(self.t));
-            let v = (0.999 * self.grad_v.0.v[i] + 0.001 * d_weights.v[i] * d_weights.v[i] / batch) / (1.0 - 0.999f64.powi(self.t));
+            let m = (0.9 * self.grad_m.0.v[i] + 0.1 * d_weights.v[i] / batch)
+                / (1.0 - 0.9f64.powi(self.t));
+            let v = (0.999 * self.grad_v.0.v[i] + 0.001 * d_weights.v[i] * d_weights.v[i] / batch)
+                / (1.0 - 0.999f64.powi(self.t));
             self.grad_m.0.v[i] = m;
             self.grad_v.0.v[i] = v;
             self.weights.v[i] -= lr * m / (v.sqrt() + 1e-8);
             if i / self.weights.cols == 0 {
-                let m = (0.9 * self.grad_m.1.v[i] + 0.1 * d_bias.v[i] / batch) / (1.0 - 0.9f64.powi(self.t));
-                let v = (0.999 * self.grad_v.1.v[i] + 0.001 * d_bias.v[i] * d_bias.v[i] / batch) / (1.0 - 0.999f64.powi(self.t));
+                let m = (0.9 * self.grad_m.1.v[i] + 0.1 * d_bias.v[i] / batch)
+                    / (1.0 - 0.9f64.powi(self.t));
+                let v = (0.999 * self.grad_v.1.v[i] + 0.001 * d_bias.v[i] * d_bias.v[i] / batch)
+                    / (1.0 - 0.999f64.powi(self.t));
                 self.grad_m.1.v[i] = m;
                 self.grad_v.1.v[i] = v;
                 self.biases.v[i] -= lr * m / (v.sqrt() + 1e-8);

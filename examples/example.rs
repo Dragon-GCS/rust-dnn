@@ -1,7 +1,7 @@
-use mlp::{MLP, layers::Linear, mat, functions};
+use mlp::{functions, layers::Linear, mat, MLP};
 
 fn test_train() {
-    let x = mat![[1.,2.,-3.], [1.,-2.,1.], [-3.,2.,1.], [1.,-2.,1.]];
+    let x = mat![[1., 2., -3.], [1., -2., 1.], [-3., 2., 1.], [1., -2., 1.]];
     let label = vec![2, 1, 0, 1];
     let y = functions::one_hot(&label, 3);
     let lr = 1e-1;
@@ -24,6 +24,6 @@ fn test_train() {
 
 fn main() {
     test_train();
-    let v = vec![1,2,3,4];
+    let v = vec![1, 2, 3, 4];
     print!("{:?}", v);
 }
