@@ -83,7 +83,7 @@ where
     T: Copy,
     U: Copy,
 {
-    type Item = (usize, Matrix<T>, Vec<U>);
+    type Item = (Matrix<T>, Vec<U>);
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.i * self.batch_size;
         if start >= self.idx.len() {
@@ -97,10 +97,6 @@ where
             batch_y.push(self.y[self.idx[i]]);
         }
         self.i += 1;
-        Some((
-            self.i - 1,
-            Matrix::new(batch_x, batch_y.len(), self.x.cols),
-            batch_y,
-        ))
+        Some((Matrix::new(batch_x, batch_y.len(), self.x.cols), batch_y))
     }
 }

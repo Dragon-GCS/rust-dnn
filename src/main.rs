@@ -3,49 +3,41 @@
 // Created at 2022/05/19 10:18
 // Edit with VS Code
 
-#![allow(dead_code, unused_imports, unused_variables)]
 mod dataset;
 
 use dataset::{read_img, read_label, Datasets};
-use mlp::{functions, layers::Linear, mat, Matrix, MLP};
-use std::io::{self, Read, Write};
+use mlp::{functions, layers::Linear, MLP};
+use std::io::{stdout, Write};
 use std::time::Instant;
 
 fn train(model: &mut MLP, dataset: &mut Datasets<f64, usize>, lr: f64, epoch: usize) {
-    let mut step = 0;
     let batches = dataset.len();
     let mut metric = functions::Metric::new();
-    for i in 0..epoch {
+    for i in 1..(epoch + 1) {
         dataset.shuffle();
         metric.reset();
         let now = Instant::now();
-        for (batch, image, label) in &mut *dataset {
+        for (batch, (image, label)) in dataset.into_iter().enumerate() {
+            let batch = batch + 1;
             let y = functions::one_hot(&label, 10);
             let (output, loss) = model.forward(&image, &y);
             let pred = output.argmax(1);
             let acc = metric.update(&pred, &label);
-            if batch % 100 == 99 || batch == 0 {
+            if batch % 100 == 0 {
                 print!(
-                    "\r[{}/{}]batch: {}/{}, loss: {:.6}, acc: {:.4} {:2}ms/batch",
-                    i + 1,
-                    epoch,
-                    batch + 1,
-                    batches,
-                    loss,
-                    acc,
-                    now.elapsed().as_millis() / (batch as u128 + 1)
+                    "\r[{i}/{epoch}]batch: {batch}/{batches}, loss: {loss:.6}, acc: {acc:.4} {:2}ms/batch",
+                    now.elapsed().as_millis() / batch as u128
                 );
-                io::stdout().flush().unwrap();
+                stdout().flush().unwrap();
             }
             model.backward(&y, lr);
-            step += 1
         }
         println!();
     }
 }
 
 fn main() {
-    let data_dir: &str = "E:\\ProjectFiles\\Python\\04_DeepLearning\\Datasets\\mnist\\raw";
+    let data_dir: &str = "D:\\Projects\\DeepLearning\\Datasets\\mnist\\raw";
     let train_img: &str = "train-images-idx3-ubyte";
     let train_label: &str = "train-labels-idx1-ubyte";
 
@@ -53,11 +45,11 @@ fn main() {
     let labels = read_label(&format!("{}/{}", data_dir, train_label));
     let batch = 25;
     let mut dataset = Datasets::new(image, labels, batch);
-
-    let mut layers = Vec::new();
-    layers.push(Linear::new(784, 32, true));
-    layers.push(Linear::new(32, 32, true));
-    layers.push(Linear::new(32, 10, false));
+    let layers = vec![
+        Linear::new(784, 32, true),
+        Linear::new(32, 32, true),
+        Linear::new(32, 10, false),
+    ];
     let mut model = MLP::new(layers);
 
     let lr = 1e-3;

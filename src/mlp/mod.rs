@@ -6,25 +6,21 @@ mod matrix;
 pub use self::matrix::Matrix;
 
 pub fn init_matrix(rows: usize, cols: usize) -> Matrix<f64> {
-    let mut v = vec![0.; rows * cols];
     let mut rng = rand::thread_rng();
-    for elem in v.iter_mut() {
-        *elem = rng.gen::<f64>() * 2. - 1.;
-    }
+    let v = (0..rows * cols)
+        .map(|_| rng.gen::<f64>() * 2. - 1.)
+        .collect();
     Matrix::new(v, rows, cols)
 }
 
+// macro_export is used to make the macro available to other modules
+// use create::mat
 #[macro_export]
 macro_rules! mat {
-    ($([$($x:expr),* $(,)*]),+ $(,)*) => {
-        $crate::Matrix::from_vec({
-        let mut buff = Vec::new();
-        $(
-            let v = vec![$($x),*];
-            buff.push(v);
-        )*
-        buff
-    })};
+    ($([$($x:expr),*]),+) => {
+        $crate::Matrix::from_vec(
+        vec![$(vec![$($x),*]),*]
+   )};
 }
 
 pub struct MLP {
@@ -41,12 +37,12 @@ impl MLP {
         }
     }
 
-    pub fn forward(&mut self, x: &Matrix<f64>, y: &Matrix<f64>) -> (Matrix<f64>, f64) {
-        let mut z = x.clone();
+    pub fn forward(&mut self, x: &Matrix<f64>, y: &Matrix<f64>) -> (&Matrix<f64>, f64) {
+        let mut inputs = x;
         for layer in self.linear.iter_mut() {
-            z = layer.forward(&z);
+            inputs = layer.forward(inputs);
         }
-        self.output.forward(&z, y)
+        self.output.forward(inputs, y)
     }
 
     pub fn backward(&mut self, y: &Matrix<f64>, lr: f64) {
@@ -54,5 +50,18 @@ impl MLP {
         for layer in self.linear.iter_mut().rev() {
             grad = layer.backward(&grad, lr);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::mat;
+
+    #[test]
+    pub fn test_mat_macro() {
+        let m = mat![[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]];
+        assert_eq!(m.rows, 3);
+        assert_eq!(m.cols, 3);
+        assert_eq!(m.v, vec![1., 2., 3., 4., 5., 6., 7., 8., 9.]);
     }
 }

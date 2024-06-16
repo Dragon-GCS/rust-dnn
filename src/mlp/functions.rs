@@ -1,14 +1,14 @@
 use super::Matrix;
 
-pub fn one_hot(label: &Vec<usize>, depth: usize) -> Matrix<f64> {
-    let rows = label.len();
-    let mut v = Vec::new();
-    for i in 0..rows {
+/// One hot encoding
+/// [0, 2,1] => [[1, 0, 0], [0, 0, 1], [0, 1, 0]]
+pub fn one_hot(labels: &[usize], depth: usize) -> Matrix<f64> {
+    let rows = labels.len();
+    let mut v = vec![0.; rows * depth];
+    for (i, label) in labels.iter().enumerate() {
         for j in 0..depth {
-            if label[i] == j {
-                v.push(1.0);
-            } else {
-                v.push(0.0);
+            if *label == j {
+                v[i * depth + j] = 1.;
             }
         }
     }
@@ -18,84 +18,81 @@ pub fn one_hot(label: &Vec<usize>, depth: usize) -> Matrix<f64> {
 /// Relu function
 /// $$f(x) =\begin{cases} x&x>0\\0 & x\le0\end{cases}$$
 pub fn relu(mat: &Matrix<f64>) -> Matrix<f64> {
-    let mut v = Vec::new();
-    for i in 0..mat.v.len() {
-        v.push(if mat.v[i] > 0.0 { mat.v[i] } else { 0.0 });
-    }
+    let v = mat
+        .v
+        .iter()
+        .map(|&num| if num > 0.0 { num } else { 0.0 })
+        .collect();
     Matrix::new(v, mat.rows, mat.cols)
 }
 
 /// Prime of the ReLU function
 /// $$f\prime(x) =\begin{cases} 1&x>0\\0&x\le0\end{cases}$$
 pub fn relu_prime(mat: &Matrix<f64>) -> Matrix<f64> {
-    let mut v = Vec::new();
-    for i in 0..mat.v.len() {
-        v.push(if mat.v[i] > 0.0 { 1.0 } else { 0.0 });
-    }
+    let v = mat
+        .v
+        .iter()
+        .map(|&num| if num > 0.0 { 1.0 } else { 0.0 })
+        .collect();
     Matrix::new(v, mat.rows, mat.cols)
 }
 
 /// Softmax function
 /// $$\sigma\prime(x)=\sigma(x)(1-\sigma(x))$$
 pub fn sigmoid(mat: &Matrix<f64>) -> Matrix<f64> {
-    let mut v = Vec::new();
-    for i in 0..mat.v.len() {
-        v.push(1.0 / (1.0 + (-mat.v[i]).exp()));
-    }
+    let v = mat
+        .v
+        .iter()
+        .map(|&num| 1.0 / (1.0 + (-num).exp()))
+        .collect();
     Matrix::new(v, mat.rows, mat.cols)
 }
 
 /// Prime of sigmoid function
 /// $$\sigma\prime(x)=\sigma(x)(1-\sigma(x))$$
 pub fn sigmoid_prime(mat: &Matrix<f64>) -> Matrix<f64> {
-    let mut v = Vec::new();
-    for i in 0..mat.v.len() {
-        v.push(mat.v[i] * (1.0 - mat.v[i]));
-    }
+    let v = mat.v.iter().map(|&num| num * (1.0 - num)).collect();
     Matrix::new(v, mat.rows, mat.cols)
 }
 
 /// Calculate the softmax of a matrix
 /// $$f(x) = \frac{e^{x_i}}{\sum_{j}e^{x_j}}$$
+/// dim = 0, sum of each column; dim = 1, sum of each row
 pub fn softmax(mat: &Matrix<f64>, dim: usize) -> Matrix<f64> {
-    let mut v = Vec::new();
-    let mut sum = Vec::new();
-    let (mut dim1, mut dim2) = (mat.rows, mat.cols);
-    if dim == 0 {
-        (dim1, dim2) = (mat.cols, mat.rows);
-    }
-    for i in 0..dim1 {
-        sum.push(0.0);
-        for j in 0..dim2 {
-            let exp = if dim == 0 {
-                mat.v[j * mat.cols + i].exp()
-            } else {
-                mat.v[i * mat.cols + j].exp()
-            };
-            v.push(exp);
-            sum[i] += exp;
-        }
-    }
-    for i in 0..dim1 {
-        for j in 0..dim2 {
-            let index = if dim == 0 {
+    let mut exp_values = mat.exp();
+    let (rows, cols) = if dim == 0 {
+        (mat.cols, mat.rows)
+    } else {
+        (mat.rows, mat.cols)
+    };
+    let mut sum_exp_values = vec![0.; rows];
+
+    sum_exp_values.iter_mut().enumerate().for_each(|(i, val)| {
+        for j in 0..cols {
+            *val += exp_values.v[if dim == 0 {
                 j * mat.cols + i
             } else {
                 i * mat.cols + j
-            };
-            v[index] /= sum[i];
+            }];
         }
-    }
-    Matrix::new(v, mat.rows, mat.cols)
+    });
+
+    sum_exp_values.iter().enumerate().for_each(|(i, val)| {
+        for j in 0..cols {
+            exp_values.v[if dim == 0 {
+                j * mat.cols + i
+            } else {
+                i * mat.cols + j
+            }] /= *val;
+        }
+    });
+    exp_values
 }
 
 /// Prime of softmax function
 /// $$f\prime(x)= f(x_i)(1 - f(x_i)) + \sum_{j\neq i} f(x_j) f(x_i) $$
 pub fn softmax_prime(mat: &Matrix<f64>) -> Matrix<f64> {
-    let mut v = Vec::new();
-    for elem in mat.v.iter() {
-        v.push(*elem * (1.0 - *elem));
-    }
+    let mut v: Vec<f64> = mat.v.iter().map(|&elem| elem * (1.0 - elem)).collect();
     for i in 0..mat.rows {
         for j in 0..mat.cols {
             for k in 0..mat.rows {
@@ -111,26 +108,30 @@ pub fn softmax_prime(mat: &Matrix<f64>) -> Matrix<f64> {
 /// Calculate the cross entropy loss of two matrix which not be softmaxed.
 /// $$f(\hat{y}, y) = -\frac{1}{n}\sum^n_{i=1}y_i\ln\hat{y}_i$$
 pub fn cross_entropy(mat: &Matrix<f64>, target: &Matrix<f64>) -> f64 {
-    let (mut sum, rows) = (0.0, mat.rows);
-    for (pred, real) in mat.v.iter().zip(target.v.iter()) {
-        if *real > 0. {
-            sum += real * pred.ln()
-        }
-    }
-    -sum / rows as f64
+    -mat.v
+        .iter()
+        .zip(target.v.iter())
+        .filter(|&(_, &real)| real > 0.)
+        .map(|(pred, real)| real * pred.ln())
+        .sum::<f64>()
+        / mat.rows as f64
 }
 
 /// Prime of two matrix's cross entropy loss with soft.
 /// $$f_i\prime(\hat{y}, y) = \hat{y_i} - y_i$$
 pub fn cross_entropy_prime(mat: &Matrix<f64>, target: &Matrix<f64>) -> Matrix<f64> {
-    let rows = mat.rows;
-    let mut v = Vec::new();
-    for (pred, real) in mat.v.iter().zip(target.v.iter()) {
-        v.push((pred - real) / rows as f64);
-    }
-    Matrix::new(v, mat.rows, mat.cols)
+    Matrix::new(
+        mat.v
+            .iter()
+            .zip(target.v.iter())
+            .map(|(pred, real)| (pred - real) / mat.rows as f64)
+            .collect(),
+        mat.rows,
+        mat.cols,
+    )
 }
 
+#[derive(Default)]
 pub struct Metric {
     right: f64,
     total: f64,
@@ -138,19 +139,17 @@ pub struct Metric {
 
 impl Metric {
     pub fn new() -> Self {
-        Self {
-            right: 0.,
-            total: 0.,
-        }
+        Self::default()
     }
 
-    pub fn update(&mut self, pred: &Vec<usize>, label: &Vec<usize>) -> f64 {
-        for (&p, &l) in pred.iter().zip(label.iter()) {
-            if p == l {
-                self.right += 1.
-            }
-            self.total += 1.;
-        }
+    pub fn update(&mut self, pred: &[usize], label: &[usize]) -> f64 {
+        self.total += pred.len() as f64;
+        self.right += pred
+            .iter()
+            .zip(label.iter())
+            .filter(|&(p, l)| p == l)
+            .count() as f64;
+
         self.right / self.total
     }
 

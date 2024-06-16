@@ -28,6 +28,7 @@ cargo build -r
 
 - Relu:
   $$f(x) =\begin{cases} x & x>0 \\\ 0 & x\le0\end{cases}$$
+
   $$f\prime(x) =\begin{cases} 1&x>0 \\\ 0&x\le0\end{cases}$$
 - Sigmoid:
   $$\sigma(x) = \frac{1}{1+e^x}$$
@@ -40,6 +41,16 @@ cargo build -r
   $$f_i\prime(\hat{y}, y) = \hat{y_i} - y_i$$
 - Adam Optimizer:
   $$v_t = \frac{\beta_1*v_{t - 1} + (1 - \beta_2)*dW}{1 - \beta_1^t}$$
-  
+
   $$s_t = \frac{\beta_2*s_{t - 1} + (1 - \beta_2)*dW}{1 - \beta_2^t}$$
   $$W = W - \alpha * \frac{v_t}{\sqrt{s_t} + \epsilon}$$
+
+## 计算优化
+
+优化后batch时间 6ms -> 4ms
+
+- 函数签名使用引用传递，尽可能避免数据复制
+- 数组填充元素时两种方法
+  1. 使用`Vec::with_capacity`预先分配内存，在逐个推入元素。
+  2. 使用`0`初始化数组，然后逐个赋值。
+  > 两种方法在性能上没有明显差异，但在做矩阵运算时需要根据行列计算索引，有额外的计算开销
