@@ -1,5 +1,6 @@
 use crate::functions as F;
 use crate::{init_matrix, Matrix};
+use rayon::prelude::*;
 
 pub struct Linear {
     pub weights: Matrix<f64>,
@@ -52,35 +53,50 @@ impl Linear {
     pub fn backward(&mut self, grad: &Matrix<f64>, lr: f64) -> Matrix<f64> {
         // d_output.shape: (batch, out_channel)
         let d_output = if self.active {
-            grad * &F::relu_prime(self.output.as_ref().unwrap())
+            &(grad * &F::relu_prime(self.output.as_ref().unwrap()))
         } else {
-            grad.clone()
+            grad
         };
         // d_weights: (in_channel, batch) & (batch, out_channel)
-        let d_weights = &self.input.as_ref().unwrap().transpose() & &d_output;
+        let d_weights = &self.input.as_ref().unwrap().transpose() & d_output;
         // d_bias: (out_channel, 1)
         let d_bias = d_output.dim_sum(0);
         let batch = grad.rows as f64;
-        d_weights.v.iter().enumerate().for_each(|(i, &weight)| {
-            let m = (0.9 * self.grad_m.0.v[i] + 0.1 * weight / batch) / (1.0 - 0.9f64.powi(self.t));
-            let v = (0.999 * self.grad_v.0.v[i] + 0.001 * weight * weight / batch)
-                / (1.0 - 0.999f64.powi(self.t));
-            self.grad_m.0.v[i] = m;
-            self.grad_v.0.v[i] = v;
-            self.weights.v[i] -= lr * m / (v.sqrt() + 1e-8);
-            if i / self.weights.cols == 0 {
-                let m = (0.9 * self.grad_m.1.v[i] + 0.1 * d_bias.v[i] / batch)
-                    / (1.0 - 0.9f64.powi(self.t));
-                let v = (0.999 * self.grad_v.1.v[i] + 0.001 * d_bias.v[i] * d_bias.v[i] / batch)
-                    / (1.0 - 0.999f64.powi(self.t));
-                self.grad_m.1.v[i] = m;
-                self.grad_v.1.v[i] = v;
-                self.biases.v[i] -= lr * m / (v.sqrt() + 1e-8);
-            }
-            self.t += 1;
-        });
+
+        d_bias
+            .v
+            .par_iter()
+            .zip(self.biases.v.par_iter_mut())
+            .zip(self.grad_m.1.v.par_iter_mut())
+            .zip(self.grad_v.1.v.par_iter_mut())
+            .enumerate()
+            .for_each(|(t, (((&d_bias, bias), grad_m), grad_v))| {
+                let t = self.t + t as i32;
+                let d_bias_batch = d_bias / batch;
+                *grad_m = (0.9 * *grad_m + 0.1 * d_bias_batch) / (1.0 - 0.9f64.powi(t));
+                *grad_v =
+                    (0.999 * *grad_v + 0.001 * d_bias * d_bias_batch) / (1.0 - 0.999f64.powi(t));
+                *bias -= lr * *grad_m / (grad_v.sqrt() + 1e-8);
+            });
+
+        d_weights
+            .v
+            .par_iter()
+            .zip(self.weights.v.par_iter_mut())
+            .zip(self.grad_m.0.v.par_iter_mut())
+            .zip(self.grad_v.0.v.par_iter_mut())
+            .enumerate()
+            .for_each(|(t, (((&d_weight, weight), grad_m), grad_v))| {
+                let t = self.t + t as i32;
+                let d_weight_batch = d_weight / batch;
+                *grad_m = (0.9 * *grad_m + 0.1 * d_weight_batch) / (1.0 - 0.9f64.powi(t));
+                *grad_v = (0.999 * *grad_v + 0.001 * d_weight * d_weight_batch)
+                    / (1.0 - 0.999f64.powi(t));
+                *weight -= lr * *grad_m / (grad_v.sqrt() + 1e-8);
+            });
+        self.t += d_weights.v.len() as i32;
         // d_input: (in_channel, out_channel) & (out_channel, num)
-        d_output & self.weights.transpose()
+        d_output & &self.weights.transpose()
     }
 }
 

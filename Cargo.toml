@@ -15,4 +15,5 @@ path = "src/mlp/mod.rs"
 [dependencies]
 num-traits = "0.2.19"
 rand = "0.8.5"
+rayon = "1.10.0"
 

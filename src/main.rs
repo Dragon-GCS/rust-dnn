@@ -25,8 +25,8 @@ fn train(model: &mut MLP, dataset: &mut Datasets<f64, usize>, lr: f64, epoch: us
             let acc = metric.update(&pred, &label);
             if batch % 100 == 0 {
                 print!(
-                    "\r[{i}/{epoch}]batch: {batch}/{batches}, loss: {loss:.6}, acc: {acc:.4} {:2}ms/batch",
-                    now.elapsed().as_millis() / batch as u128
+                    "\r[{i}/{epoch}]batch: {batch}/{batches}, loss: {loss:.6}, acc: {acc:.4} {:}us/batch",
+                    now.elapsed().as_micros() / batch as u128
                 );
                 stdout().flush().unwrap();
             }
